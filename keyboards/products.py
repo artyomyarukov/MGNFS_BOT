@@ -42,3 +42,34 @@ def mask_for_lips_keyboard():
         ]
     )
     return keyboard
+def yes_no_back_keyboard():
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Да", callback_data="yes")],
+            [InlineKeyboardButton(text="Нет", callback_data="no")],
+            [InlineKeyboardButton(text="Назад", callback_data="back")]
+        ]
+    )
+    return keyboard
+def format_product_kb():
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Блеск-бальзам", callback_data="f_glosses_balms")],
+            [InlineKeyboardButton(text="Бальзам в железной баночке", callback_data="f_balms_in_iron")],
+            [InlineKeyboardButton(text="Бальзам в стике", callback_data="f_balms_in_stick")],
+            [InlineKeyboardButton(text="Маска для губ", callback_data="f_mask_for_lips")],
+            [InlineKeyboardButton(text="Назад", callback_data="back")]
+        ]
+    )
+    return keyboard
+def aromat_kb():
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Вишня", callback_data="f_cherry")],
+            [InlineKeyboardButton(text="Пломбир", callback_data="f_plombir")],
+            [InlineKeyboardButton(text="Гранат-клюква", callback_data="f_granat_kl")],
+            [InlineKeyboardButton(text="Без запаха", callback_data="f_no_aromat")],
+            [InlineKeyboardButton(text="Назад", callback_data="back")]
+        ]
+    )
+    return keyboard

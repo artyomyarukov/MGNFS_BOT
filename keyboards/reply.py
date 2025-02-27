@@ -1,4 +1,4 @@
-from aiogram.types import KeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 
@@ -9,20 +9,7 @@ def get_keyboard(
         request_location: int = None,
         sizes: tuple[int] = (2,),
 ):
-    '''
-    Parameters request_contact and request_location must be as indexes of btns args for buttons you need.
-    Example:
-    get_keyboard(
-            "Меню",
-            "О магазине",
-            "Варианты оплаты",
-            "Варианты доставки",
-            "Отправить номер телефона",
-            placeholder="Что вас интересует?",
-            request_contact=4,
-            sizes=(2, 2, 1)
-        )
-    '''
+
     keyboard = ReplyKeyboardBuilder()
 
     for index, text in enumerate(btns, start=0):
@@ -38,3 +25,28 @@ def get_keyboard(
     return keyboard.adjust(*sizes).as_markup(
         resize_keyboard=True, input_field_placeholder=placeholder)
 
+
+
+ADMIN_KB = get_keyboard(
+    "Добавить товар",
+    "Удалить товар",
+    "Ассортимент",
+    "Вернуться в главное меню",  # Новая кнопка
+    placeholder="Выберите действие",
+    sizes=(2,2),
+)
+ASS_KB = get_keyboard(
+    "Блески-бальзамы",
+    "Бальзамы в железной баночке",
+    "Бальзамы в стике",
+    "Маски для губ",
+    "Назад к админ панели",
+    placeholder="Выберите категорию",
+    sizes=(2, 2),
+)
+
+BACK_KB = get_keyboard(
+    "Назад",
+    placeholder="Вернуться назад",
+    sizes=(1,),
+)

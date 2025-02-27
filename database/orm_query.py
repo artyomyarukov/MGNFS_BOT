@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import GlossesBalms, BalmInStick, BalmInIron, MaskForLip
-from sqlalchemy import select
+from sqlalchemy import select,delete
 async def orm_add_product(session: AsyncSession, data: dict):
     # Проверка данных
     required_fields = ["category", "name", "price", "image"]
@@ -51,3 +51,24 @@ async def orm_get_mask_for_lip(session: AsyncSession):
     query = select(MaskForLip)
     result = await session.execute(query)
     return result.scalars().all()
+async def orm_delete_product(session: AsyncSession, product_name: str, category: str):
+    """
+    Удаляет товар из базы данных по его названию и категории.
+    """
+    if category == "Блески-бальзамы":
+        query = delete(GlossesBalms).where(GlossesBalms.name == product_name)
+    elif category == "Бальзамы в стике":
+        query = delete(BalmInStick).where(BalmInStick.name == product_name)
+    elif category == "Бальзамы в железной баночке":
+        query = delete(BalmInIron).where(BalmInIron.name == product_name)
+    elif category == "Маски для губ":
+        query = delete(MaskForLip).where(MaskForLip.name == product_name)
+    else:
+        raise ValueError("Неверная категория товара")
+
+    result = await session.execute(query)
+    await session.commit()
+
+    # Проверяем, был ли удален хотя бы один товар
+    if result.rowcount == 0:
+        raise ValueError("Товар с таким названием не найден в указанной категории.")
