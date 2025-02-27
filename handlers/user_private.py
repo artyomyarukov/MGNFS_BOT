@@ -1,7 +1,7 @@
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.orm_query import orm_get_glosses_balms, orm_get_balm_in_stick, orm_get_balm_in_iron, orm_get_mask_for_lip
@@ -37,15 +37,24 @@ class Questionnaire(StatesGroup):
     aromat = State()
 
 
-
+welcome_text = (
+        "Давай выберем формат твоего продукта"
+    )
 
 
 @router.message(Command("start"))
 async def cmd_start(message: Message):
-    welcome_text = (
-        "Что хочешь приобрести?"
+
+    file_path = "GUID.pdf"
+    # Отправляем файл
+    await message.answer_document(
+        document=FSInputFile(file_path),  # Используем FSInputFile для загрузки файла
+        caption="Памятка покупателю",  # Подпись к файлу
     )
     await message.answer(welcome_text, reply_markup=start_keyboard())
+
+
+
 @router.callback_query(lambda query: query.data == "unique_product")
 async def start_questionnaire(query: CallbackQuery, state: FSMContext):
     await query.message.edit_text("Испытываете ли вы сухость губ?", reply_markup=yes_no_back_keyboard())
@@ -54,7 +63,7 @@ async def start_questionnaire(query: CallbackQuery, state: FSMContext):
 @router.callback_query(Questionnaire.dry_lips)
 async def process_dry_lips(query: CallbackQuery, state: FSMContext):
     if query.data == "back":
-        await query.message.edit_text("Что хочешь приобрести?", reply_markup=start_keyboard())
+        await query.message.edit_text(welcome_text, reply_markup=start_keyboard())
         await state.clear()
         return
     await state.update_data(dry_lips=query.data)
@@ -216,14 +225,14 @@ class RProduct(StatesGroup):
 # Хэндлер для выбора готового продукта
 @router.callback_query(lambda query: query.data == "ready_product")
 async def choose_product_type(query: CallbackQuery, state: FSMContext):
-    await query.message.edit_text("Выберите категорию:", reply_markup=main_keyboard())
+    await query.message.edit_text("Выберите формат продукта", reply_markup=main_keyboard())
     await state.set_state(RProduct.category_state)
 
 # Хэндлер для обработки выбора категории
 @router.callback_query(RProduct.category_state)
 async def handle_category_selection(query: CallbackQuery, state: FSMContext, session: AsyncSession):
     if query.data == "back_to_start":
-        await query.message.edit_text("Что хотите сделать?", reply_markup=start_keyboard())
+        await query.message.edit_text(welcome_text, reply_markup=start_keyboard())
         await state.clear()
         return
 
@@ -251,7 +260,7 @@ async def handle_category_selection(query: CallbackQuery, state: FSMContext, ses
     for product in products:
         await query.message.answer_photo(
             photo=product.image,
-            caption=f"Категория: {product.category}\nНазвание: {product.name}\nЦена: {int(product.price)} руб.",
+            caption=f"Продукт: {product.category}\nНазвание: {product.name}\nЦена: {int(product.price)} руб.",
         )
 
     product_buttons = [
