@@ -1,13 +1,15 @@
-from aiogram import Router, types
+from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import GlossesBalms, BalmInIron, BalmInStick, MaskForLip
+from database.orm_query import orm_get_glosses_balms, orm_get_balm_in_stick, orm_get_balm_in_iron, orm_get_mask_for_lip
 from filters.chat_types import ChatTypeFilter
 from keyboards.main import main_keyboard
 from keyboards.products import glosses_balms_keyboard, balms_in_iron_keyboard, balms_in_stick_keyboard, \
     mask_for_lips_keyboard, yes_no_back_keyboard, format_product_kb, aromat_kb
+from keyboards.reply import ASS_KB
 from utils.messages import get_product_added_message
 from aiogram.types import InputMediaPhoto
 from sqlalchemy import select
@@ -33,6 +35,8 @@ class Questionnaire(StatesGroup):
     allergies = State()
     format_product = State()
     aromat = State()
+
+
 
 
 
@@ -117,44 +121,6 @@ async def process_smoke(query: CallbackQuery, state: FSMContext):
     await query.message.edit_text("Есть ли у вас аллергия?", reply_markup=yes_no_back_keyboard())
     await state.set_state(Questionnaire.allergies)
 
-'''
-@router.callback_query(Questionnaire.allergies)
-async def process_allergies(query: CallbackQuery, state: FSMContext):
-    if query.data == "back":
-        await query.message.edit_text("Курите ли вы?", reply_markup=yes_no_back_keyboard())
-        await state.set_state(Questionnaire.smoke)
-        return
-    await state.update_data(allergies=query.data)
-    data = await state.get_data()
-    user_name = query.from_user.full_name
-    user_id = query.from_user.username if query.from_user.username else f"ID: {query.from_user.id}"
-    # Преобразуем ответы в читаемый формат
-    responses = {
-        "dry_lips": "Сухость губ",
-        "cracked_lips": "Трескаются ли губы",
-        "inflamed_lips": "Воспаление кожи на губах",
-        "peeling_lips": "Шелушение губ",
-        "chapped_lips": "Обветривание губ",
-        "bite_lips": "Кусание губ",
-        "smoke": "Курение",
-        "allergies": "Аллергии"
-    }
-
-    formatted_responses = []
-    for key, value in data.items():
-        question = responses.get(key, key)  # Получаем понятный текст вопроса
-        answer = "Да" if value == "yes" else "Нет"  # Преобразуем ответ в "Да" или "Нет"
-        formatted_responses.append(f"{question}: {answer}")
-
-    # Собираем итоговое сообщение
-    response_message = f"Ответы пользователя @{user_id} ({user_name}):\n" + "\n".join(formatted_responses)
-
-    await query.message.edit_text("Спасибо за ответы! Ваши данные сохранены.\nСкоро с вами свяжется менеджер для уточнения деталей и оформления заказа.\nПо всем вопросам писать @splvll или @itskkira\nЖелаете ли еще что-нибудь выбрать?",reply_markup=start_keyboard())
-    await state.clear()
-    # Отправка данных в определенный чат
-    await query.bot.send_message(chat_id=-4612151315, text=response_message)
-    
-'''
 @router.callback_query(Questionnaire.allergies)
 async def process_allergies(query: CallbackQuery, state: FSMContext):
     if query.data == "back":
@@ -233,12 +199,129 @@ async def process_allergies(query: CallbackQuery, state: FSMContext):
     # Отправка данных в определенный чат
     await query.bot.send_message(chat_id=-4612151315, text=response_message)
 
-#хэндлеры для обработки готовых продуктов
-@router.callback_query(lambda query: query.data in ["ready_product"])
-async def choose_product_type(query: CallbackQuery):
-    await query.message.edit_text("Выберите продукт", reply_markup=main_keyboard())
+    # Состояния для выбора готового продукта
 
 
 
+from aiogram import types
+from aiogram.fsm.context import FSMContext
+from aiogram.filters.state import State, StatesGroup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+class RProduct(StatesGroup):
+    category_state = State()
+    product_state = State()
+    count = State()
+
+# Хэндлер для выбора готового продукта
+@router.callback_query(lambda query: query.data == "ready_product")
+async def choose_product_type(query: CallbackQuery, state: FSMContext):
+    await query.message.edit_text("Выберите категорию:", reply_markup=main_keyboard())
+    await state.set_state(RProduct.category_state)
+
+# Хэндлер для обработки выбора категории
+@router.callback_query(RProduct.category_state)
+async def handle_category_selection(query: CallbackQuery, state: FSMContext, session: AsyncSession):
+    if query.data == "back_to_start":
+        await query.message.edit_text("Что хотите сделать?", reply_markup=start_keyboard())
+        await state.clear()
+        return
+
+    await state.update_data(category_state=query.data)
+
+    if query.data == "glosses_balms":
+        products = await orm_get_glosses_balms(session)
+    elif query.data == "balms_in_iron":
+        products = await orm_get_balm_in_iron(session)
+    elif query.data == "balms_in_stick":
+        products = await orm_get_balm_in_stick(session)
+    elif query.data == "mask_for_lips":
+        products = await orm_get_mask_for_lip(session)
+    else:
+        await query.answer("Неизвестная категория.")
+        return
+
+    if not products:
+        await query.message.delete()
+        await query.message.answer("Товары в этой категории отсутствуют. Выберите другую категорию:",
+                                   reply_markup=main_keyboard())
+        await state.set_state(RProduct.category_state)
+        return
+
+    for product in products:
+        await query.message.answer_photo(
+            photo=product.image,
+            caption=f"Категория: {product.category}\nНазвание: {product.name}\nЦена: {int(product.price)} руб.",
+        )
+
+    product_buttons = [
+        [InlineKeyboardButton(text=product.name, callback_data=f"product_{product.name}")]
+        for product in products
+    ]
+    product_buttons.append([InlineKeyboardButton(text="Назад", callback_data="ready_product")])
+
+    products_kb = InlineKeyboardMarkup(inline_keyboard=product_buttons)
+
+    await query.message.answer("Что хотите заказать?", reply_markup=products_kb)
+    await state.set_state(RProduct.product_state)
+
+# Хэндлер для обработки выбора товара
+@router.callback_query(RProduct.product_state)
+async def handle_product_selection(query: CallbackQuery, state: FSMContext):
+    if query.data == "ready_product":
+        await choose_product_type(query, state)
+        return
+
+    product_id = query.data.replace("product_", "")
+    await state.update_data(product_id=product_id)
+
+    # Создаем клавиатуру с кнопкой "Назад"
+    back_button = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Назад", callback_data="back_to_product")]
+    ])
+    await query.message.delete()
+    await query.message.answer("Укажите количество")
+    await state.set_state(RProduct.count)
 
 
+
+# Хэндлер для ввода количества
+@router.message(RProduct.count)
+async def handle_count_input(message: types.Message, state: FSMContext):
+    try:
+        count = int(message.text)
+        if count <= 0:
+            await message.answer("Количество должно быть больше нуля. Попробуйте снова.")
+            return
+    except ValueError:
+        await message.answer("Пожалуйста, введите корректное число.")
+        return
+
+    await state.update_data(count=count)
+    data = await state.get_data()
+    category = data.get("category_state")
+    product_id = data.get("product_id")
+    count = data.get("count")
+    # Словарь для перевода категорий на русский
+    category_translations = {
+        "glosses_balms": "Блески и бальзамы",
+        "balms_in_iron": "Бальзамы в железной упаковке",
+        "balms_in_stick": "Бальзамы в стике",
+        "mask_for_lips": "Маски для губ",
+    }
+
+    # Переводим категорию на русский
+    category_ru = category_translations.get(category, category)
+    username = message.from_user.username
+    if not username:  # Если username отсутствует, используем first_name
+        username = message.from_user.first_name
+
+    target_chat_id = -4612151315
+    await message.bot.send_message(
+        chat_id=target_chat_id,
+        text=f"Новый заказ:\nПользователь: @{username}\n"
+             f"Категория: {category_ru}\nИмя товара: {product_id}\nКоличество: {count}"
+    )
+
+    await state.clear()
+    await message.answer("Ваш заказ успешно отправлен!\nСкоро с вами свяжеться менеджер\nПо всем вопросам писать - @itskkira или @splvll\nЖелаете ли заказать что-ниубудь еще? ",reply_markup=start_keyboard())

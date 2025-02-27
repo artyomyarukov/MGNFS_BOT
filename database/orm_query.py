@@ -72,3 +72,20 @@ async def orm_delete_product(session: AsyncSession, product_name: str, category:
     # Проверяем, был ли удален хотя бы один товар
     if result.rowcount == 0:
         raise ValueError("Товар с таким названием не найден в указанной категории.")
+async def orm_get_product_by_id(session: AsyncSession, product_id: int, category: str):
+    """
+    Получает товар по его ID и категории.
+    """
+    if category == "Блески-бальзамы":
+        query = select(GlossesBalms).where(GlossesBalms.id == product_id)
+    elif category == "Бальзамы в стике":
+        query = select(BalmInStick).where(BalmInStick.id == product_id)
+    elif category == "Бальзамы в железной баночке":
+        query = select(BalmInIron).where(BalmInIron.id == product_id)
+    elif category == "Маски для губ":
+        query = select(MaskForLip).where(MaskForLip.id == product_id)
+    else:
+        raise ValueError("Неверная категория товара")
+
+    result = await session.execute(query)
+    return result.scalars().first()

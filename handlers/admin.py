@@ -4,7 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from aiogram.types import ReplyKeyboardRemove
+from aiogram.types import ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 
 from database.orm_query import (
     orm_add_product,
@@ -53,7 +53,13 @@ async def admin_features(message: types.Message):
 @admin_router.message(F.text == "Вернуться в главное меню")
 async def back_to_main_menu(message: types.Message, state: FSMContext):
     await state.clear()  # Очищаем состояние
-    keyboard = start_keyboard()  # Получаем инлайн-клавиатуру главного меню
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Свой уникальный продукт", callback_data="unique_product")],
+            [InlineKeyboardButton(text="Готовый продукт", callback_data="ready_product")]
+        ]
+    )
+    # Получаем инлайн-клавиатуру главного меню
     await message.answer(
         "Вы вернулись в главное меню",
         reply_markup=ReplyKeyboardRemove(),  # Удаляем клавиатуру админа
