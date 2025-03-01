@@ -12,8 +12,8 @@ async def orm_add_product(session: AsyncSession, data: dict):
 
     # Сопоставляем категорию с моделью
     model_mapping = {
-        "Бальзамы в железной баночке": BalmInStick,
-        "Бальзамы в стике": BalmInIron,
+        "Бальзамы в железной баночке": BalmInIron,
+        "Бальзамы в стике": BalmInStick,
         "Маски для губ": MaskForLip,
     }
 
