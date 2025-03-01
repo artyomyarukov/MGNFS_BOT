@@ -150,6 +150,7 @@ async def process_allergies(query: CallbackQuery, state: FSMContext):
     await state.update_data(allergies=query.data)
     await query.message.edit_text("Теперь выберем формат продукта", reply_markup=format_product_kb())
     await state.set_state(Questionnaire.format_product)
+
 def color_keyboard():
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="01", callback_data="color_01")],
@@ -166,21 +167,28 @@ async def process_format_product(query: CallbackQuery, state: FSMContext):
         await query.message.edit_text("Есть ли у вас аллергия?", reply_markup=yes_no_back_keyboard())
         await state.set_state(Questionnaire.allergies)
         return
+
     await state.update_data(format_product=query.data)
 
-    # Создаем медиагруппу с фотографиями
-    media_group = [
-        InputMediaPhoto(media=FSInputFile("color_1.jpg"), caption="Цвет 01"),
-        InputMediaPhoto(media=FSInputFile("color_2.jpg"), caption="Цвет 02"),
-        InputMediaPhoto(media=FSInputFile("color_3.jpg"), caption="Цвет 03")
-    ]
+    # Проверяем, выбран ли формат "Блеск-бальзам"
+    if query.data == "f_glosses_balms":
+        # Создаем медиагруппу с фотографиями
+        media_group = [
+            InputMediaPhoto(media=FSInputFile("color_1.jpg"), caption="Цвет 01"),
+            InputMediaPhoto(media=FSInputFile("color_2.jpg"), caption="Цвет 02"),
+            InputMediaPhoto(media=FSInputFile("color_3.jpg"), caption="Цвет 03")
+        ]
 
-    # Отправляем медиагруппу
-    await query.message.answer_media_group(media=media_group)
+        # Отправляем медиагруппу
+        await query.message.answer_media_group(media=media_group)
 
-    # Отправляем сообщение с выбором цвета
-    await query.message.answer("Теперь выберете цвет продукта", reply_markup=color_keyboard())
-    await state.set_state(Questionnaire.color_product)
+        # Отправляем сообщение с выбором цвета
+        await query.message.answer("Теперь выберете цвет продукта\nФотографии показаны в соответствии с номером", reply_markup=color_keyboard())
+        await state.set_state(Questionnaire.color_product)
+    else:
+        # Если выбран не "Блеск-бальзам", сразу переходим к выбору аромата
+        await query.message.answer("Теперь выберем аромат продукта", reply_markup=aromat_kb())
+        await state.set_state(Questionnaire.aromat)
 
 
 @router.callback_query(Questionnaire.color_product)
@@ -201,22 +209,22 @@ async def process_color_product(query: CallbackQuery, state: FSMContext):
 @router.callback_query(Questionnaire.aromat)
 async def process_aromat(query: CallbackQuery, state: FSMContext):
     if query.data == "back":
-        # Удаляем предыдущее сообщение (если нужно)
-        await query.message.delete()
-
-        # Создаем медиагруппу с фотографиями
-        media_group = [
-            InputMediaPhoto(media=FSInputFile("color_1.jpg"), caption="Цвет 01"),
-            InputMediaPhoto(media=FSInputFile("color_2.jpg"), caption="Цвет 02"),
-            InputMediaPhoto(media=FSInputFile("color_3.jpg"), caption="Цвет 03")
-        ]
-
-        # Отправляем медиагруппу
-        await query.message.answer_media_group(media=media_group)
-
-        # Отправляем сообщение с выбором цвета
-        await query.message.answer("Теперь выберете цвет продукта", reply_markup=color_keyboard())
-        await state.set_state(Questionnaire.color_product)
+        # Возвращаем пользователя к выбору цвета, если это "Блеск-бальзам"
+        data = await state.get_data()
+        if data.get("format_product") == "f_glosses_balms":
+            await query.message.delete()
+            media_group = [
+                InputMediaPhoto(media=FSInputFile("color_1.jpg"), caption="Цвет 01"),
+                InputMediaPhoto(media=FSInputFile("color_2.jpg"), caption="Цвет 02"),
+                InputMediaPhoto(media=FSInputFile("color_3.jpg"), caption="Цвет 03")
+            ]
+            await query.message.answer_media_group(media=media_group)
+            await query.message.answer("Теперь выберете цвет продукта\nФотографии показаны в соответствии с номером", reply_markup=color_keyboard())
+            await state.set_state(Questionnaire.color_product)
+        else:
+            # Если не "Блеск-бальзам", возвращаем к выбору формата продукта
+            await query.message.edit_text("Теперь выберем формат продукта", reply_markup=format_product_kb())
+            await state.set_state(Questionnaire.format_product)
         return
 
     await state.update_data(aromat=query.data)
@@ -251,7 +259,7 @@ async def process_aromat(query: CallbackQuery, state: FSMContext):
         if value == "f_no_aromat":
             answer = "Без запаха"
         if value == "f_glosses_balms":
-            answer = "Блес-бальзам"
+            answer = "Блеск-бальзам"
         if value == "f_balms_in_iron":
             answer = "Бальзам в железной баночке"
         if value == "f_balms_in_stick":
@@ -265,6 +273,10 @@ async def process_aromat(query: CallbackQuery, state: FSMContext):
         if value == "color_03":
             answer = "03"
         formatted_responses.append(f"{question}: {answer}")
+
+    # Если формат продукта не "Блеск-бальзам", добавляем "без цвета"
+    if data.get("format_product") != "f_glosses_balms":
+        formatted_responses.append("Цвет продукта: без цвета")
 
     # Собираем итоговое сообщение
     response_message = f"Ответы пользователя @{user_id} ({user_name}):\n" + "\n".join(formatted_responses)
